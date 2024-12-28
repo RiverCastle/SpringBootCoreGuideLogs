@@ -63,3 +63,26 @@ private DependencyPart2 part2;
 핵심 요약
 @Mock: Mockito에서 제공하는 어노테이션으로, 테스트 클래스 내에서 모의 객체를 생성합니다. 이 객체는 Spring ApplicationContext와는 독립적이며, 수동으로 의존성을 주입해야 합니다.
 @MockBean: Spring Boot에서 제공하는 어노테이션으로, 테스트 컨텍스트에 모의 객체를 등록합니다. 이 객체는 Spring의 의존성 주입을 통해 자동으로 주입될 수 있습니다.
+
+2. 컨트롤러 단위테스트를 방해한 JPA, Spring Security
+   책의 테스트 코드를 내 프로젝트 테스트 코드에 따라하면서 겪은 시행착오들이 있다. 하나는 컨트롤러 단위테스트를 진행하면서 데이터베이스? 정확히는 jpaAuditingHandler와의 의존성에서 시작했다. 떠오른 것은 각 객체의 생성, 삭제, 수정 시각을 저장하기 위해 @EnableJpaAuditing를 사용한다는 것이었다. 근데 이게 단위테스트에서 문제를 일으켰다.
+
+Cannot resolve reference to bean 'jpaMappingContext' while setting constructor argument
+
+검색 끝에, 이 또한 @MockBean으로 가짜 객체로 스프링 컨텍스트에 등록하여 해결할 수 있었다. 
+@MockBean(JpaMetamodelMappingContext.class)
+
+같은 맥락에서 MockMvc를 사용해서 모의 Http 요청을 보내고 해당 요청에 대한 응답을 검증하였다. 첫 실행에서 302코드를 받았다. 
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/quiz-content/review-content/123
+    Session Attrs = {SPRING_SECURITY_SAVED_REQUEST=DefaultSavedRequest [http://localhost/api/quiz-content/review-content/123?continue]}
+
+MockHttpServletResponse:
+           Status = 302
+             Body = 
+    Forwarded URL = null
+   Redirected URL = http://localhost/oauth2/authorization/kakao
+   
+여기서 해결 아이디어를 얻은 내용은 스프링 시큐리티, auth였다. 사실 어쩌면 예상을 조금은 했었다. 인증이 필요한 요청인데, 모의 요청에서 또한 필요하지 않았을까 생각했다. 그래서 테스트 코드에서 시큐리티에 대한 설정을 해제할 수 있는 방법에 대해서 검색하였고, @AutoConfigureMockMvc(addFilters = false) 어노테이션을 붙여서 해결하였다. 
